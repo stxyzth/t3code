@@ -1,3 +1,4 @@
+import { ThreadMission } from "./ThreadMission";
 import * as Dialog from "../../components/ui/Dialog";
 import { useRememberThreadProject } from "./useRememberThreadProject";
 import { useOpenPullRequest } from "../../native/useOpenPullRequest";
@@ -975,15 +976,31 @@ function ThreadRouteContent(
         <ThreadScreenBinding
           header={
             props.inspectorPresentation ? null : (
-              <ThreadHeader
-                title={selectedThread.title}
-                subtitle={headerSubtitle}
-                gitControls={threadGitControlProps}
-                hasThreadCwd={selectedThreadCwd !== null}
-                inspectorMode={inspectorMode}
-                onOpenFilesInspector={handleOpenFilesInspector}
-                onReturnToThread={props.onReturnToThread}
-              />
+              <>
+                <ThreadHeader
+                  title={selectedThread.title}
+                  subtitle={headerSubtitle}
+                  gitControls={threadGitControlProps}
+                  hasThreadCwd={selectedThreadCwd !== null}
+                  inspectorMode={inspectorMode}
+                  onOpenFilesInspector={handleOpenFilesInspector}
+                  onReturnToThread={props.onReturnToThread}
+                />
+                {selectedThreadDetail && serverConfig?.threadMissions === true ? (
+                  <ThreadMission
+                    key={`${selectedThread.environmentId}:${selectedThread.id}`}
+                    environmentId={selectedThread.environmentId}
+                    threadId={selectedThread.id}
+                    mission={selectedThreadDetail.thread.mission}
+                    canOperate={canOperateThread}
+                    isWorking={selectedThreadDetail.runs.some((run) =>
+                      ["queued", "preparing", "starting", "running", "waiting"].includes(
+                        run.status,
+                      ),
+                    )}
+                  />
+                ) : null}
+              </>
             )
           }
           canOperateThread={canOperateThread}

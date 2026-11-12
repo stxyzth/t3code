@@ -226,7 +226,7 @@ export type ProjectionSettlementCandidate = Pick<
   | "pendingBackgroundTasks"
   | "pendingGuestMessageCount"
 > &
-  Pick<OrchestrationV2AppThread, "lastSnoozeWakeAt"> & {
+  Pick<OrchestrationV2AppThread, "lastSnoozeWakeAt" | "mission"> & {
     readonly latestUserAuthoredMessageAt: DateTime.Utc | null;
   };
 
@@ -492,6 +492,10 @@ export interface ProjectionStoreV2Shape {
     messageIds: ReadonlyArray<MessageId>,
   ) => Effect.Effect<
     ReadonlyMap<MessageId, OrchestrationV2ConversationMessage>,
+    ProjectionStoreV2Error
+  >;
+  readonly getActiveMissionThreads: () => Effect.Effect<
+    ReadonlyArray<OrchestrationV2AppThread>,
     ProjectionStoreV2Error
   >;
   readonly getThreadRecords: <K extends ProjectionRecordField>(
@@ -7045,6 +7049,17 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
     );
 
+    const getActiveMissionThreads = Effect.fn("ProjectionStore.getActiveMissionThreads")(
+      function* () {
+        const rows = yield* sql<PayloadRow>`
+          SELECT payload_json FROM orchestration_v2_projection_threads
+          WHERE deleted_at IS NULL AND json_extract(payload_json, '$.mission.status') = 'active'
+        `;
+        return yield* Effect.forEach(rows, (row) => decodeThreadPayload(row.payload_json));
+      },
+      Effect.mapError((cause) => new ProjectionStoreSetupError({ cause })),
+    );
+
     const getThreadsWithPullRequests: ProjectionStoreV2Shape["getThreadsWithPullRequests"] =
       Effect.fn("ProjectionStore.getThreadsWithPullRequests")(
         function* (threadId) {
@@ -7830,6 +7845,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
       getThreadWorktreePaths: readOnReader(getThreadWorktreePaths),
       getOpenRemoteDelegatedTasks: getOpenRemoteDelegatedTasks.pipe(NodeSqliteClient.readOnly),
       getThreadProjection: readOnReader(getThreadProjection),
+      getActiveMissionThreads: readOnReader(getActiveMissionThreads),
       getTurnStartContext: readOnReader(getTurnStartContext),
       getTurnStartHistory: readOnReader(getTurnStartHistory),
       getRuntimeRecoveryProjection: readOnReader(getRuntimeRecoveryProjection),

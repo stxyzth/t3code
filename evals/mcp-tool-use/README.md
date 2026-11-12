@@ -305,3 +305,15 @@ After the change, the first reference to a file is an absolute link. The remaini
 2. From `evals/`, run `pnpm mcp-tool-use:trim-capture <claude|codex> <capture.json> mcp-tool-use/templates/<claude|codex>.json.gz`. It keeps only what `run.ts` reads, and removes user instructions, the user's own skills and agents, account ids, and home paths.
 3. Read the output for user data before you commit it: `zcat <file> | less`.
 4. Run the full eval on the old and new templates, and compare.
+
+## Mission reports
+
+`cases/missions.ndjson` checks verification success, verification defects, and an
+ordinary conversation that must not report a mission. The runner builds the stage
+prompt from the production `missionPrompt`; the tool schema and description also
+come from this checkout. These cases check reporting decisions, not whether the
+model actually implements or verifies a feature.
+
+```sh
+pnpm mcp-tool-use --cases mcp-tool-use/cases/missions.ndjson --samples 1 --out runs/missions
+```

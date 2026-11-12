@@ -91,6 +91,50 @@ const writesThread = <P extends { readonly threadId?: ThreadId | undefined }, A,
 ) => McpToolAccess.writesThreads((params: P) => [params.threadId], handle);
 
 export const layer = McpToolAccess.toLayer(ThreadToolkit, {
+  t3_mission_report: McpToolAccess.writesThreads(
+    () => [undefined],
+    (_input: import("@t3tools/contracts").MissionReport) =>
+      Effect.gen(function* () {
+        const { scope, threads, caller } = yield* readCaller();
+        if (scope.thread === undefined || caller?.activeRunId == null) {
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "Report from the mission's running thread.",
+          });
+        }
+        const projection = yield* threads
+          .getThreadRecords(scope.thread.threadId, ["providerThreads", "runs"])
+          .pipe(Effect.mapError(unavailable));
+        const run = projection.runs.find((run) => run.id === caller.activeRunId);
+        const providerThread = projection.providerThreads.find(
+          (thread) => thread.id === run?.providerThreadId,
+        );
+        const mission = projection.thread.mission;
+        if (
+          mission === undefined ||
+          providerThread?.providerSessionId !== scope.thread.providerSessionId
+        ) {
+          return yield* new OrchestratorMcpFailure({
+            code: "invalid_request",
+            message: "This provider session does not own the mission turn.",
+          });
+        }
+        const result = yield* threads
+          .dispatch({
+            type: "thread.metadata.update",
+            commandId: yield* newCommandId(),
+            threadId: scope.thread.threadId,
+            missionAction: {
+              type: "report",
+              expectedRevision: mission.revision,
+              runId: caller.activeRunId,
+              ..._input,
+            },
+          })
+          .pipe(Effect.mapError(dispatchFailure));
+        return { sequence: result.sequence };
+      }),
+  ),
   run_scheduled_task_now: McpToolAccess.writesEnvironment((input) =>
     Effect.gen(function* () {
       const scheduler = yield* ScheduledTasks.ScheduledTaskService;

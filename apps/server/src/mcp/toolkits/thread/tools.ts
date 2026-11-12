@@ -1,5 +1,6 @@
 import {
   OrchestratorMcpEnvironmentTarget,
+  MissionReport,
   ScheduledTaskId,
   ScheduledTask,
   OrchestrationSearchThreadsInput,
@@ -237,7 +238,15 @@ const ScheduledTaskRunTool = Tool.make("run_scheduled_task_now", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 
+const MissionReportTool = Tool.make("t3_mission_report", {
+  ...commandTool,
+  description:
+    "Report the current mission turn's progress before ending it. Use stage_complete when this stage is finished, needs_work when verification found a defect, blocked when a person or access is needed, or progress to continue the same stage. Include concrete evidence; finishing verification needs one entry per acceptance criterion. Only available inside the mission's running thread. Does not start missions or grant permission to publish.",
+  parameters: MissionReport,
+}).annotate(Tool.Destructive, false);
+
 export const ThreadToolkit = Toolkit.make(
+  MissionReportTool,
   ScheduledTaskRunTool,
   ThreadSearchTool,
   ThreadConfigureTool,

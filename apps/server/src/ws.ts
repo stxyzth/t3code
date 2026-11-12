@@ -1843,6 +1843,7 @@ export const layerWsRpc = (
           threadResumeCompletionMarker: true,
           threadSnapshotPagination: true,
           threadFind: true,
+          threadMissions: true,
           threadFindProgressive: true,
           secretProviderSettings: true,
           secretReferences: true,

@@ -12,6 +12,28 @@ becomes an attachment when inserting it would exceed the message limit. On a
 hardware keyboard, use `Cmd+Shift+V` on Apple devices or `Ctrl+Shift+V` elsewhere
 to keep a large paste editable in the composer instead.
 
+## Missions
+
+Use **Run a mission** in an idle thread to give the agent an outcome and acceptance
+criteria. T3 continues through planning, implementation, and verification, then
+returns the result for your review. Missions use the thread’s selected provider,
+workspace, and permissions. Start in default mode without another active goal or
+background task. The hosting server must stay running for work to continue.
+
+The default allowance is eight mission turns. This counts automatic follow-up
+turns, not tokens, delegated work, or provider-native loops. Every turn uses your
+provider account. You can grant more turns when the allowance runs out, up to 30.
+
+Pause or end a mission to stop follow-up turns; the current turn can finish. Use
+Stop to interrupt current work and pause the mission. A failed turn, missing
+progress report, or unrelated conversation pauses or blocks automatic progress.
+Resolve the issue in the thread and resume when it is idle.
+
+Verification evidence is reported by the agent. Review it and the actual changes
+before accepting the result. A mission does not grant additional permission to
+publish, deploy, merge, or contact others. Providers must expose T3’s mission
+reporting tool; without a report, the mission stops for your review.
+
 ## Formatting
 
 The composer writes Markdown and shows it styled as you type. When your cursor

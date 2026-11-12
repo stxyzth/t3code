@@ -1,3 +1,4 @@
+import { decideMissionAction } from "./missionDecision.ts";
 import type {
   OrchestrationV2ThreadLinkMetadata,
   GuestShareId,
@@ -3755,6 +3756,61 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         commandType: command.type,
         cause: `Thread ${command.threadId} is deleted.`,
       });
+    }
+    if (command.type === "thread.metadata.update" && command.missionAction !== undefined) {
+      const projection = yield* projectionStore
+        .getThreadRecords(
+          command.threadId,
+          ["runs", "runtimeRequests", "providerThreads", "turnItems"],
+          {
+            turnItemTypes: ["command_execution", "dynamic_tool", "subagent"],
+            turnItemStatuses: ["pending", "running", "waiting"],
+          },
+        )
+        .pipe(mapDispatchError(command));
+      const now = yield* DateTime.now;
+      const decision = decideMissionAction({
+        now,
+        commandId: command.commandId,
+        action: command.missionAction,
+        projection,
+      });
+      if (decision === null) return;
+      if ("error" in decision) {
+        return yield* new OrchestratorDispatchError({
+          commandId: command.commandId,
+          commandType: command.type,
+          cause: decision.error,
+        });
+      }
+      yield* emit(
+        events,
+        command,
+      )({
+        type: "thread.metadata-updated",
+        threadId: command.threadId,
+        providerInstanceId: thread.providerInstanceId,
+        occurredAt: now,
+        payload: { ...thread, mission: decision.mission, updatedAt: now },
+      });
+      if (decision.prompt !== undefined && decision.mission.lastMessageId !== null) {
+        yield* dispatchMessage(
+          {
+            type: "message.dispatch",
+            commandId: command.commandId,
+            threadId: command.threadId,
+            messageId: decision.mission.lastMessageId,
+            text: decision.prompt,
+            attachments: [],
+            dispatchMode: { type: "start_immediately" },
+            createdBy: "agent",
+            creationSource: "server",
+          },
+          events,
+          effects,
+        );
+      }
+      return;
     }
     if (
       command.type === "thread.pull-request.watch" &&
@@ -11883,6 +11939,24 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const emitEvent = emit(input.events, input.command);
     const { runs, subagents } = input.projection;
     let { thread } = input.projection;
+    if (thread.mission?.status === "active") {
+      thread = {
+        ...thread,
+        mission: {
+          ...thread.mission,
+          revision: thread.mission.revision + 1,
+          status: "paused",
+          summary: "Mission paused by Stop.",
+        },
+        updatedAt: input.now,
+      };
+      yield* emitEvent({
+        type: "thread.metadata-updated",
+        threadId: thread.id,
+        occurredAt: input.now,
+        payload: thread,
+      });
+    }
     let recovery = thread.limitRecovery;
     const latest = latestExecutedRun(runs);
     if (latest?.status === "failed") {
@@ -14109,6 +14183,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             ),
           );
         if (
+          (thread.mission !== undefined &&
+            !["completed", "cancelled"].includes(thread.mission.status)) ||
           thread.settledOverride !== null ||
           DateTime.toEpochMillis(thread.updatedAt) > DateTime.toEpochMillis(command.snapshotAt)
         ) {
@@ -14572,6 +14648,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
         (planned) =>
           planned.events.length > 0 ||
           isUnobservedAcknowledgement(command) ||
+          (command.type === "thread.metadata.update" &&
+            command.missionAction?.type === "advance") ||
           command.type === "thread.background-work.settle" ||
           command.type === "thread.interrupt.unresponsive" ||
           command.type === "thread.stop" ||

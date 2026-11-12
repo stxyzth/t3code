@@ -1,3 +1,4 @@
+import { ThreadMission } from "./chat/ThreadMission";
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -3353,6 +3354,18 @@ export default function ChatView(props: ChatViewProps) {
           </header>
         )}
 
+        {isServerThread && serverProjection && serverConfig?.threadMissions === true ? (
+          <ThreadMission
+            key={`${activeThread.environmentId}:${activeThread.id}`}
+            environmentId={activeThread.environmentId}
+            threadId={activeThread.id}
+            mission={serverProjection.thread.mission}
+            canOperate={canOperateThread}
+            isWorking={serverProjection.runs.some((run) =>
+              ["queued", "preparing", "starting", "running", "waiting"].includes(run.status),
+            )}
+          />
+        ) : null}
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <ThreadFindCanvas
             findOptions={{
